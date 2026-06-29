@@ -1,19 +1,18 @@
 """
-ربات تلگرام - فیلتر Whitelist کلمات
-نسخه سازگار با python-telegram-bot 13.15
+Telegram Whitelist Bot - Compatible with python-telegram-bot 20.7
 """
 
 import logging
 from telegram import Update
 from telegram.ext import (
-    Updater,
+    ApplicationBuilder,
     MessageHandler,
     CommandHandler,
-    Filters,
-    CallbackContext,
+    filters,
+    ContextTypes,
 )
 
-BOT_TOKEN = "8768235339:AAHoOrTZLMX880hXkw3JqCg8c_FbrbYwVQs"
+BOT_TOKEN = "8768235339:AAH00rTZLMX880hkw3JqCg8c_FbrbYwVQs"
 
 ALLOWED_WORDS = {
     "لیست",
@@ -38,30 +37,30 @@ def is_allowed(text):
     return any(word in text_lower for word in ALLOWED_WORDS)
 
 
-def is_admin(update, context):
+async def is_admin(update, context):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    member = context.bot.get_chat_member(chat_id, user_id)
+    member = await context.bot.get_chat_member(chat_id, user_id)
     return member.status in ("administrator", "creator")
 
 
-def filter_message(update, context):
+async def filter_message(update, context):
     message = update.effective_message
     user = update.effective_user
 
     if not message or not message.text:
         return
 
-    if is_admin(update, context):
+    if await is_admin(update, context):
         return
 
     if is_allowed(message.text):
         return
 
     try:
-        message.delete()
+        await message.delete()
     except Exception as e:
-        logger.warning(f"حذف پیام ناموفق: {e}")
+        logger.warning(f"Delete failed: {e}")
         return
 
     user_id = user.id
@@ -70,78 +69,72 @@ def filter_message(update, context):
 
     if count >= MAX_WARNINGS:
         try:
-            context.bot.ban_chat_member(update.effective_chat.id, user_id)
-            context.bot.send_message(
+            await context.bot.ban_chat_member(update.effective_chat.id, user_id)
+            await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"⛔ {user.first_name} بعد از {MAX_WARNINGS} اخطار از گروه بن شد."
+                text=f"⛔ {user.first_name} banned after {MAX_WARNINGS} warnings."
             )
             warning_count.pop(user_id, None)
         except Exception as e:
-            logger.warning(f"بن کردن ناموفق: {e}")
+            logger.warning(f"Ban failed: {e}")
     else:
         remaining = MAX_WARNINGS - count
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=(
-                f"⚠️ {user.first_name}، پیام تو حذف شد.\n"
-                f"فقط پیام‌هایی که شامل کلمات مجاز باشن قابل ارساله.\n"
-                f"اخطار {count}/{MAX_WARNINGS} — {remaining} اخطار تا بن"
+                f"⚠️ {user.first_name}, your message was deleted.\n"
+                f"Only messages with allowed words are permitted.\n"
+                f"Warning {count}/{MAX_WARNINGS} — {remaining} left before ban"
             ),
         )
 
 
-def add_word(update, context):
-    if not is_admin(update, context):
-        update.message.reply_text("❌ فقط ادمین‌ها می‌تونن از این دستور استفاده کنن.")
+async def add_word(update, context):
+    if not await is_admin(update, context):
+        await update.message.reply_text("❌ Only admins can use this command.")
         return
-
     if not context.args:
-        update.message.reply_text("📝 استفاده: /addword کلمه")
+        await update.message.reply_text("📝 Usage: /addword word")
         return
-
     word = " ".join(context.args).strip().lower()
     ALLOWED_WORDS.add(word)
-    update.message.reply_text(f"✅ کلمه «{word}» به لیست مجاز اضافه شد.")
+    await update.message.reply_text(f"✅ Word '{word}' added to allowed list.")
 
 
-def remove_word(update, context):
-    if not is_admin(update, context):
-        update.message.reply_text("❌ فقط ادمین‌ها می‌تونن از این دستور استفاده کنن.")
+async def remove_word(update, context):
+    if not await is_admin(update, context):
+        await update.message.reply_text("❌ Only admins can use this command.")
         return
-
     if not context.args:
-        update.message.reply_text("📝 استفاده: /removeword کلمه")
+        await update.message.reply_text("📝 Usage: /removeword word")
         return
-
     word = " ".join(context.args).strip().lower()
     ALLOWED_WORDS.discard(word)
-    update.message.reply_text(f"🗑️ کلمه «{word}» از لیست مجاز حذف شد.")
+    await update.message.reply_text(f"🗑️ Word '{word}' removed from allowed list.")
 
 
-def list_words(update, context):
-    if not is_admin(update, context):
+async def list_words(update, context):
+    if not await is_admin(update, context):
         return
-
     if not ALLOWED_WORDS:
-        update.message.reply_text("📋 لیست کلمات مجاز خالیه!")
+        await update.message.reply_text("📋 Allowed words list is empty!")
         return
-
     words = "\n".join(f"• {w}" for w in sorted(ALLOWED_WORDS))
-    update.message.reply_text(f"📋 کلمات مجاز:\n{words}")
+    await update.message.reply_text(f"📋 Allowed words:\n{words}")
 
 
 def main():
-    updater = Updater(BOT_TOKEN)
-    dp = updater.dispatcher
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    dp.add_handler(CommandHandler("addword", add_word))
-    dp.add_handler(CommandHandler("removeword", remove_word))
-    dp.add_handler(CommandHandler("listwords", list_words))
-    dp.add_handler(MessageHandler(Filters.text & Filters.group, filter_message))
+    app.add_handler(CommandHandler("addword", add_word))
+    app.add_handler(CommandHandler("removeword", remove_word))
+    app.add_handler(CommandHandler("listwords", list_words))
+    app.add_handler(
+        MessageHandler(filters.TEXT & filters.ChatType.GROUPS, filter_message)
+    )
 
-    logger.info("ربات شروع به کار کرد...")
-    updater.start_polling()
-    updater.idle()
+    logger.info("Bot started!")
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
