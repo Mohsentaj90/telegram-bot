@@ -23,7 +23,7 @@ ALLOWED_WORDS = {
     "for me",
 }
 
-MAX_WARNINGS = 3
+MAX_WARNINGS = 7
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -84,8 +84,8 @@ async def filter_message(update, context):
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=(
-                f"⚠️ {user.first_name}, your message was deleted.\n"
-                f"Only messages with allowed words are permitted.\n"
+                f"⚠️ {user.first_name}, پیام شما حذف شد.\n"
+                f"لطفاً فقط از پیام‌های مجاز استفاده کنید، در غیر این صورت از گروه حذف خواهید شد\n"
                 f"Warning {count}/{MAX_WARNINGS} — {remaining} left before ban"
             ),
         )
