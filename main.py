@@ -12,7 +12,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
-BOT_TOKEN = "8768235339:AAH00rTZLMX880hkw3JqCg8c_FbrbYwVQs"
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ALLOWED_WORDS = {
     "لیست",
